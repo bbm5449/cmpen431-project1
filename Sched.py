@@ -173,8 +173,8 @@ def simulate(instructions, numRegisters, issueWidth):
 def printcycles(instructions):
     for inst in instructions[0:]:
         for stage in range(5,11):
-            print("{:02d}".format(inst[stage]),end=",")
-        print("{:02d}".format(inst[11]))
+            print("{:d}".format(inst[stage]),end=",")
+        print("{:d}".format(inst[11]))
 
 def main():
     filename = sys.argv[1]
