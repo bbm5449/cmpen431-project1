@@ -46,15 +46,17 @@ def decode(instructions, indices, cycle):
         indices[1][i] = indices[0][i]
 
 def rename(instructions, indices, cycle, renameBuffer, freeList, mapTable):
+    print(freeList)
     for i in range(len(indices[2])):
         if indices[2][i] != -1:
             instructions[indices[2][i]][7] = cycle
         if indices[1][i] != -1:
             renameBuffer.append(indices[1][i])
-        indices[2][i] = indices[1][i]
+        indices[2][i] = -1
 
     for i in range(len(indices[2])):
-        if freeList and indices[2][i] != -1:
+        if freeList and renameBuffer:
+            indices[2][i] = renameBuffer.popleft()
             dst = instructions[indices[2][i]][1]
             src1 = instructions[indices[2][i]][3]
             src2 = instructions[indices[2][i]][4]
@@ -67,13 +69,12 @@ def rename(instructions, indices, cycle, renameBuffer, freeList, mapTable):
                 instructions[indices[2][i]][1] = mapTable[dst] = freeList.popleft()
 
 
-def dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, lsq):
+def dispatch(instructions, indices, cycle, readyTable, iq, lsq):
     for i in range(len(indices[3])):
         if indices[3][i] != -1:
             instructions[indices[3][i]][8] = cycle
-        if renameBuffer:
-            #issue queue: instr, src1, r, src2, r, dst, age
-            indices[3][i] = renameBuffer.popleft()
+        if indices[2][i] != -1:
+            indices[3][i] = indices[2][i]
             instr = instructions[indices[3][i]][0]
             dst = instructions[indices[3][i]][1]
             src1 = instructions[indices[3][i]][3]
@@ -132,7 +133,6 @@ def commit(instructions, indices, cycle, freeList, lsq, committedInstructions):
     for i in range(len(indices[6])):
         if committedInstructions<len(instructions) and instructions[committedInstructions][10]:
             instr = instructions[committedInstructions][0]
-            dst = instructions[committedInstructions][1]
             overwriteReg = instructions[committedInstructions][2]
             if instr == 'L' and committedInstructions not in lsq:
                 freeList.append(overwriteReg)
@@ -157,11 +157,11 @@ def simulate(instructions, numRegisters, issueWidth):
     cycle = 0
     committedInstructions = 0
     freeList, mapTable, readyTable, renameBuffer, iq, lsq = initializeStructures(numRegisters)
+    issueWidth = min(issueWidth, len(instructions))
     indices = [[i for i in range(issueWidth)],
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)]]
     while committedInstructions < len(instructions):
-        print(indices)
         committedInstructions = commit(instructions, indices, cycle, freeList, lsq, committedInstructions)
         writeback(instructions, indices, cycle, readyTable, lsq)
         issue(instructions, indices, cycle, readyTable, iq)
