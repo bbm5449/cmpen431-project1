@@ -1,7 +1,6 @@
 import csv
 import sys
 from collections import deque
-import heapq
 
 def readinputs(filename):
     insts=[]
@@ -92,7 +91,7 @@ def dispatch(instructions, indices, cycle, readyTable, iq, lsq):
         else:
             indices[3][i] = -1
 
-def issue(instructions, indices, cycle, readyTable, iq):
+def issue(instructions, indices, cycle, readyTable, iq, lsq):
     for issue in iq:
         issue[4] = readyTable[issue[3]]
         issue[6] = readyTable[issue[5]]
@@ -107,40 +106,46 @@ def issue(instructions, indices, cycle, readyTable, iq):
         indices[4][i] = -1
 
     count, i = 0, 0
+    load, store = 0, 0
     idx = []
     while count < len(indices[4]) and i < len(iq):
         issue = iq[i]
         if issue[4] and issue[6]:
-            indices[4][count] = issue[0]
-            idx.append(i)
-            count += 1
+            if issue[1] == 'L' and lsq[0] == issue[0] and store == 0:
+                lsq.popleft()
+                indices[4][count] = issue[0]
+                idx.append(i)
+                load = 1
+                count += 1
+            elif issue[1] == 'S' and lsq[0] == issue[0] and load == 0:
+                lsq.popleft()
+                indices[4][count] = issue[0]
+                idx.append(i)
+                store = 1
+                count += 1
+            elif issue[1] != 'L' and issue[1] != 'S':
+                indices[4][count] = issue[0]
+                idx.append(i)
+                count += 1
         i += 1
     idx.sort(reverse=True)
     for i in idx:
         del iq[i]
 
-def writeback(instructions, indices, cycle, readyTable, lsq):
+def writeback(instructions, indices, cycle, readyTable):
     for i in range(len(indices[5])):
         if indices[5][i] != -1:
             instructions[indices[5][i]][10] = cycle
-        instr = instructions[indices[5][i]][0]
         indices[5][i] = indices[4][i]
         dst = instructions[indices[5][i]][1]
-        if instr == 'L' and lsq[0] == indices[5][i]:
-            lsq.popleft()
         readyTable[dst] = 1
 
-def commit(instructions, indices, cycle, freeList, lsq, committedInstructions):
+def commit(instructions, indices, cycle, freeList, committedInstructions):
     for i in range(len(indices[6])):
         if committedInstructions<len(instructions) and instructions[committedInstructions][10]:
             instr = instructions[committedInstructions][0]
             overwriteReg = instructions[committedInstructions][2]
-            if instr == 'L' and committedInstructions not in lsq:
-                freeList.append(overwriteReg)
-                indices[6][i] = committedInstructions
-                committedInstructions += 1
-            elif instr == 'S' and committedInstructions == lsq[0]:
-                lsq.popleft()
+            if instr == 'S':
                 indices[6][i] = committedInstructions
                 committedInstructions += 1
             else:
@@ -163,9 +168,9 @@ def simulate(instructions, numRegisters, issueWidth):
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)]]
     while committedInstructions < len(instructions):
-        committedInstructions = commit(instructions, indices, cycle, freeList, lsq, committedInstructions)
-        writeback(instructions, indices, cycle, readyTable, lsq)
-        issue(instructions, indices, cycle, readyTable, iq)
+        committedInstructions = commit(instructions, indices, cycle, freeList, committedInstructions)
+        writeback(instructions, indices, cycle, readyTable)
+        issue(instructions, indices, cycle, readyTable, iq, lsq)
         dispatch(instructions, indices, cycle, readyTable, iq, lsq)
         rename(instructions, indices, cycle, renameBuffer, freeList, mapTable)
         decode(instructions, indices, cycle)
