@@ -9,7 +9,6 @@ def readinputs(filename):
     with open(filename) as csvfile:
         instreader = list(csv.reader(csvfile,delimiter=','))
         numRegisters, issueWidth = instreader[0][0], instreader[0][1]
-        #instruction name, dst, overwritten register, source 1, source 2
         for i in range(1, len(instreader)):
             row = instreader[i]
             if row[0] == 'R':
@@ -28,9 +27,8 @@ def initializeStructures(numRegisters):
     readyTable = [1]*32 + [0]*32
     renameBuffer = deque([])
     iq = []
-    rob = deque([])
     lsq = deque([])
-    return freeList, mapTable, readyTable, renameBuffer, iq, rob, lsq
+    return freeList, mapTable, readyTable, renameBuffer, iq, lsq
 
 def fetch(instructions, indices, cycle):
     for i in range(len(indices[0])):
@@ -69,7 +67,7 @@ def rename(instructions, indices, cycle, renameBuffer, freeList, mapTable):
                 instructions[indices[2][i]][1] = mapTable[dst] = freeList.popleft()
 
 
-def dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, rob, lsq):
+def dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, lsq):
     for i in range(len(indices[3])):
         if indices[3][i] != -1:
             instructions[indices[3][i]][8] = cycle
@@ -89,15 +87,17 @@ def dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, rob, ls
                 src2Ready = 1
             iq.append([indices[3][i], instr, dst, src1, src1Ready, src2, src2Ready])
             readyTable[dst] = 0
-            rob.append([indices[3][i]]+instructions[indices[3][i]][:5])
         else:
             indices[3][i] = -1
 
 def issue(instructions, indices, cycle, readyTable, iq):
     for issue in iq:
-        if issue[3] != -1 and issue[4] != -1:
-            issue[4] = readyTable[issue[3]]
-            issue[6] = readyTable[issue[5]]
+        issue[4] = readyTable[issue[3]]
+        issue[6] = readyTable[issue[5]]
+        if issue[3] == -1:
+            issue[4] = 1
+        if issue[5] == -1:
+            issue[6] = 1
 
     for i in range(len(indices[4])):
         if indices[4][i] != -1:
@@ -129,33 +129,34 @@ def writeback(instructions, indices, cycle, readyTable, lsq):
         readyTable[dst] = 1
 
 def commit(instructions, indices, cycle, freeList, lsq, committedInstructions):
-    # for i in range(len(indices[6])):
-    #     if indices[6][i] != -1:
-    #         instructions[indices[6][i]][11] = cycle
-    #     indices[6][i] = -1
+    for i in range(len(indices[6])):
+        if committedInstructions<len(instructions) and instructions[committedInstructions][10]:
+            instr = instructions[committedInstructions][0]
+            dst = instructions[committedInstructions][1]
+            overwriteReg = instructions[committedInstructions][2]
+            if instr == 'L' and committedInstructions not in lsq:
+                freeList.append(overwriteReg)
+                indices[6][i] = committedInstructions
+                committedInstructions += 1
+            elif instr == 'S' and committedInstructions == lsq[0]:
+                lsq.popleft()
+                indices[6][i] = committedInstructions
+                committedInstructions += 1
+            else:
+                freeList.append(overwriteReg)
+                indices[6][i] = committedInstructions
+                committedInstructions += 1
+        else:
+            indices[6][i] = -1
+        if indices[6][i] != -1:
+            instructions[indices[6][i]][11] = cycle
 
-    # for i in range(len(indices[5])):
-    #     instr = instructions[indices[5][i]][0]
-    #     overwriteReg = instructions[indices[5][i]][2]
-    #     if committedInstructions == indices[5][i]:
-    #         if (instr == 'S' or instr == 'L') and indices[5][i] not in lsq:
-    #             indices[6][i] = indices[5][i]
-    #             if overwriteReg != -1:
-    #                 freeList.append(overwriteReg)
-    #             committedInstructions += 1
-    #         elif instr == 'R' or instr == 'I':
-    #             instructions[indices[5][i]] = cycle
-    #             freeList.append(overwriteReg)
-    #             committedInstructions += 1
-    #     if lsq and instr == 'S' and lsq[0] == indices[5][i]:
-    #         lsq.popleft()
-
-    return committedInstructions+1
+    return committedInstructions
 
 def simulate(instructions, numRegisters, issueWidth):
     cycle = 0
     committedInstructions = 0
-    freeList, mapTable, readyTable, renameBuffer, iq, rob, lsq = initializeStructures(numRegisters)
+    freeList, mapTable, readyTable, renameBuffer, iq, lsq = initializeStructures(numRegisters)
     indices = [[i for i in range(issueWidth)],
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],
                [-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)],[-1 for i in range(issueWidth)]]
@@ -164,7 +165,7 @@ def simulate(instructions, numRegisters, issueWidth):
         committedInstructions = commit(instructions, indices, cycle, freeList, lsq, committedInstructions)
         writeback(instructions, indices, cycle, readyTable, lsq)
         issue(instructions, indices, cycle, readyTable, iq)
-        dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, rob, lsq)
+        dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, lsq)
         rename(instructions, indices, cycle, renameBuffer, freeList, mapTable)
         decode(instructions, indices, cycle)
         fetch(instructions, indices, cycle)
