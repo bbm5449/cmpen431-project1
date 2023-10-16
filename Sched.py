@@ -54,18 +54,20 @@ def rename(instructions, indices, cycle, renameBuffer, freeList, mapTable):
         indices[2][i] = -1
 
     for i in range(len(indices[2])):
-        if freeList and renameBuffer:
-            indices[2][i] = renameBuffer.popleft()
-            dst = instructions[indices[2][i]][1]
-            src1 = instructions[indices[2][i]][3]
-            src2 = instructions[indices[2][i]][4]
-            if src1 != -1:
-                instructions[indices[2][i]][3] = mapTable[src1]
-            if src2 != -1:
-                instructions[indices[2][i]][4] = mapTable[src2]            
-            if dst != -1:
-                instructions[indices[2][i]][2] = mapTable[dst]
-                instructions[indices[2][i]][1] = mapTable[dst] = freeList.popleft()
+        if renameBuffer:
+            instr = instructions[renameBuffer[0]][0]
+            if (instr == 'S') or (instr != 'S' and freeList):
+                indices[2][i] = renameBuffer.popleft()
+                dst = instructions[indices[2][i]][1]
+                src1 = instructions[indices[2][i]][3]
+                src2 = instructions[indices[2][i]][4]
+                if src1 != -1:
+                    instructions[indices[2][i]][3] = mapTable[src1]
+                if src2 != -1:
+                    instructions[indices[2][i]][4] = mapTable[src2]            
+                if dst != -1:
+                    instructions[indices[2][i]][2] = mapTable[dst]
+                    instructions[indices[2][i]][1] = mapTable[dst] = freeList.popleft()
 
 
 def dispatch(instructions, indices, cycle, readyTable, iq, lsq):
