@@ -46,7 +46,6 @@ def decode(instructions, indices, cycle):
         indices[1][i] = indices[0][i]
 
 def rename(instructions, indices, cycle, renameBuffer, freeList, mapTable):
-    print(freeList)
     for i in range(len(indices[2])):
         if indices[2][i] != -1:
             instructions[indices[2][i]][7] = cycle
@@ -180,10 +179,7 @@ def printcycles(instructions):
 def main():
     filename = sys.argv[1]
     instructions, numRegisters, issueWidth = readinputs(filename)
-    print('Before:')
-    printcycles(instructions)
     simulate(instructions, numRegisters, issueWidth)
-    print('After:')
     printcycles(instructions)
     
 if __name__ == "__main__":
