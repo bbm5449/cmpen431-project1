@@ -165,7 +165,7 @@ def simulate(instructions, numRegisters, issueWidth):
         committedInstructions = commit(instructions, indices, cycle, freeList, lsq, committedInstructions)
         writeback(instructions, indices, cycle, readyTable, lsq)
         issue(instructions, indices, cycle, readyTable, iq)
-        dispatch(instructions, indices, cycle, readyTable, renameBuffer, iq, lsq)
+        dispatch(instructions, indices, cycle, readyTable, iq, lsq)
         rename(instructions, indices, cycle, renameBuffer, freeList, mapTable)
         decode(instructions, indices, cycle)
         fetch(instructions, indices, cycle)
